@@ -1,0 +1,19 @@
+#!/bin/bash
+
+./test.out 130 100000 0 b
+./test.out 130 100000 0 w
+./test.out 130 100000 0 p
+./test.out 130 100000 0 c
+./test.out 130 100000 0 b b
+./test.out 130 100000 0 c b
+./test.out 130 100000 0 c b b
+./test.out 130 100000 0 r
+
+./test.out 131 100000 0 b
+./test.out 131 100000 0 w
+./test.out 131 100000 0 p
+./test.out 131 100000 0 c
+./test.out 131 100000 0 b b
+./test.out 131 100000 0 c b
+./test.out 131 100000 0 c b b
+./test.out 131 100000 0 r
