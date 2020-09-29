@@ -6,6 +6,7 @@
 #include "Config.hh"
 #include "FaultDomain.hh"
 #include "ECC.hh"
+#include "AccessFACH.hh"
 
 //------------------------------------------------------------------------------
 ErrorType worseErrorType(ErrorType a, ErrorType b) {
@@ -83,6 +84,21 @@ ErrorType FaultDomain::genScenarioRandomFaultAndTest(ECC *ecc, int faultCount, s
     return result;
 }
 
+/**
+ *  @brief when new fault is generated, this function search operationalFaultList 
+ *         to find some faults belonging to same codeword of new fault.
+ *         By decoding new fault's codeword with ECC, this function determine what's the error type.
+ * 
+ *  Input:
+ * 
+ *   - ECC *ecc : when new fault is generated and made in unit
+ * 
+ * 
+ *  Return:
+ *   
+ *   - ErrorType result : enum class consisting of (NE=0, CE=1, DUE=2, SDC=3)
+ * 
+ */
 ErrorType FaultDomain::genSystemRandomFaultAndTest(ECC *ecc) {
     CacheLine blk = {pinsPerDevice, (devicesPerRank -(int) retiredChipIDList.size()) * pinsPerDevice - (int) retiredPinIDList.size(), blkHeight};
     Fault *newFault;
@@ -116,78 +132,99 @@ ErrorType FaultDomain::genSystemRandomFaultAndTest(ECC *ecc) {
     }
 
 #if 1
-    operationalFaultList.push_back(newFault);
+    //-------------------------------------
+    // ***** Fault Cache *******
+    // - search fault cache
+    // - when new fault had already mapped in fault cache, inspect block like new Fault wasn't there
+    // - Also popup newFault from operationalFaultList.
+    //-------------------------------------
+    double remap_ratio = 0;
+    remap_ratio = genSingleFault(newFault);
+   
+    // newFault is already mapped into fault cache
+    if(remap_ratio==1){
+        return NE;
+    }else{
+        operationalFaultList.push_back(newFault);
+        newFault->remapRatio = remap_ratio;
 
-    //----------------------------------------------------------
-    // 3. check overlapping previous fault
-    // - check the most severe one
-    //----------------------------------------------------------
-    auto it1 = operationalFaultList.crbegin();
-    bool overlap1 = false;
-    for (++it1; it1!=operationalFaultList.crend(); ++it1) {
-        if ((*it1)->overlap(newFault)) {
-            overlap1 = true;
-            bool overlap2 = false;
-            auto it2 = it1;
-            for (++it2; it2!=operationalFaultList.crend(); ++it2) {
-                if ((*it2)->overlap(newFault) && (*it2)->overlap(*it1)) {
-                    overlap2 = true;
-                    bool overlap3 = false;
-                    auto it3 = it2;
-                    for (++it3; it3!=operationalFaultList.crend(); ++it3) {
-                        if ((*it3)->overlap(newFault) && (*it3)->overlap(*it1) && (*it3)->overlap(*it2)) {
-                            overlap3 = true;
-                            bool overlap4 = false;
-                            auto it4 = it3;
-                            for (++it4; it4!=operationalFaultList.crend(); ++it4) {
-                                if ((*it4)->overlap(newFault) && (*it4)->overlap(*it1) && (*it4)->overlap(*it2) && (*it4)->overlap(*it3)) {
-                                    overlap4 = true;
-                                    assert(0);
+        //----------------------------------------------------------
+        // 3. check overlapping previous fault
+        // - check the most severe one
+        //----------------------------------------------------------
+
+        auto it1 = operationalFaultList.crbegin();
+        bool overlap1 = false;
+        for (++it1; it1!=operationalFaultList.crend(); ++it1) {
+            if ((*it1)->overlap(newFault)) {
+                overlap1 = true;
+                bool overlap2 = false;
+                auto it2 = it1;
+                for (++it2; it2!=operationalFaultList.crend(); ++it2) {
+                    if ((*it2)->overlap(newFault) && (*it2)->overlap(*it1)) {
+                        overlap2 = true;
+                        bool overlap3 = false;
+                        auto it3 = it2;
+                        for (++it3; it3!=operationalFaultList.crend(); ++it3) {
+                            if ((*it3)->overlap(newFault) && (*it3)->overlap(*it1) && (*it3)->overlap(*it2)) {
+                                overlap3 = true;
+                                bool overlap4 = false;
+                                auto it4 = it3;
+                                for (++it4; it4!=operationalFaultList.crend(); ++it4) {
+                                    if ((*it4)->overlap(newFault) && (*it4)->overlap(*it1) && (*it4)->overlap(*it2) && (*it4)->overlap(*it3)) {
+                                        overlap4 = true;
+                                        assert(0);
+                                    }
+                                }
+                                if (!overlap4) {  // only it1, it2, it3 are overlapped
+                                    blk.reset();
+                                    if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
+                                    (*it1)->genRandomError(&blk);
+                                    (*it2)->genRandomError(&blk);
+                                    (*it3)->genRandomError(&blk);
+                                    newFault->genRandomError(&blk);
+                                    result = worseErrorType(result, ecc->decode(this, blk));
                                 }
                             }
-                            if (!overlap4) {
-                                blk.reset();
-                                if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
-                                (*it1)->genRandomError(&blk);
-                                (*it2)->genRandomError(&blk);
-                                (*it3)->genRandomError(&blk);
-                                newFault->genRandomError(&blk);
-                                result = worseErrorType(result, ecc->decode(this, blk));
-                            }
+                        }
+                        if (!overlap3) {
+                            blk.reset();
+                            if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
+                            (*it1)->genRandomError(&blk);
+                            (*it2)->genRandomError(&blk);
+                            newFault->genRandomError(&blk);
+                            result = worseErrorType(result, ecc->decode(this, blk));
                         }
                     }
-                    if (!overlap3) {
-                        blk.reset();
-                        if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
-                        (*it1)->genRandomError(&blk);
-                        (*it2)->genRandomError(&blk);
-                        newFault->genRandomError(&blk);
-                        result = worseErrorType(result, ecc->decode(this, blk));
-                    }
+                }
+                if (!overlap2) {
+                    blk.reset();
+                    if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
+                    (*it1)->genRandomError(&blk);
+                    newFault->genRandomError(&blk);
+                    // Debug
+                    // newFault->FaultDebug(&blk);
+                    result = worseErrorType(result, ecc->decode(this, blk));
                 }
             }
-            if (!overlap2) {
-                blk.reset();
-                if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
-                (*it1)->genRandomError(&blk);
-                newFault->genRandomError(&blk);
-                result = worseErrorType(result, ecc->decode(this, blk));
-            }
         }
-    }
-    if (!overlap1) {
-        blk.reset();
-        if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
-        newFault->genRandomError(&blk);
-        result = worseErrorType(result, ecc->decode(this, blk));
-    }
+        if (!overlap1) {
+            blk.reset();
+            if (inherentFault!=NULL) inherentFault->genRandomError(&blk);
+            newFault->genRandomError(&blk);
+            result = worseErrorType(result, ecc->decode(this, blk));
+        }
+        
 
-    if ((result==CE)&&ecc->getDoRetire()&&ecc->needRetire(this, newFault)) {
-        retiredBlkCount += newFault->getAffectedBlkCount();
-        operationalFaultList.remove(newFault);
-        delete newFault;
-    }
-    return result;
+        //----------------------------------------------------------
+        // check whether new fault need to belong to optionalList 
+        // (eg. Transient Fault is not expressed next time.... --> removed from operationalFaultList)
+        //----------------------------------------------------------
+        if ((result==CE)&&ecc->getDoRetire()&&ecc->needRetire(this, newFault)) {
+            retiredBlkCount += newFault->getAffectedBlkCount();
+            operationalFaultList.remove(newFault);
+            delete newFault;
+        }
 #else
     auto faultEnd = operationalFaultList.rend();
     for (auto it1 = operationalFaultList.rbegin(); it1!=faultEnd; ++it1) {
@@ -231,7 +268,12 @@ ErrorType FaultDomain::genSystemRandomFaultAndTest(ECC *ecc) {
     }
 
     return result;
+
 #endif
+    }
+    // Debug
+    // newFault->FaultDebug(&blk);
+    return result;
 }
 
 //------------------------------------------------------------------------------

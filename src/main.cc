@@ -17,6 +17,7 @@
 #include "AIECC.hh"
 #include "XED.hh"
 #include "REGB.hh"
+#include "AccessFACH.hh"
 #include "DUO.hh"
 
 void testBamboo(int ID, DomainGroup *dg);
@@ -24,8 +25,8 @@ void testFrugal(int ID);
 void testAIECC(int ID);
 void testDUO(int ID);
 
-//#define BAMBOO
-#define AGECC
+#define BAMBOO
+//#define AGECC
 
 int main(int argc, char **argv)
 {
@@ -43,11 +44,13 @@ int main(int argc, char **argv)
     ECC *ecc = NULL;
     Tester *tester = NULL;
     Scrubber *scrubber = NULL;
-
+    
     //int DIMMcnt = 100000;
     int DIMMcnt = 4;
     //int DIMMcnt = 2;
     //int DIMMcnt = 1;
+
+    initCache(); // Fault cache init
 
 #ifdef BAMBOO
     switch (atoi(argv[1])) {
@@ -727,6 +730,9 @@ int main(int argc, char **argv)
     }
 #endif /* AGECC */
 
+    // system-level test:
+    // If the 4th argument is 'S', it will use fault rate to generate a fault
+    // and type the fault based on the fault breakdown ratios (single-bit, single-row, ...)
     if (strcmp(argv[4], "S")==0) {
         tester = new TesterSystem();
         scrubber = new PeriodicScrubber(8);
@@ -738,10 +744,14 @@ int main(int argc, char **argv)
         tester->test(dg, ecc, scrubber, atol(argv[2]), filePrefix, argc-5, faults);
         delete tester;
         delete scrubber;
-    } else {
+    }
+    else
+    // Scenario-based test
+    // If the 4th argument is not 'S', it will use an individual scenario (E.g. single bit + single bit faults on a single ECC block)
+    {
         tester = new TesterScenario();
         scrubber = new NoScrubber();
-
+        
         string faults[argc-4];
         for (int i=4; i<argc; i++) {
             faults[i-4] = string(argv[i]);
