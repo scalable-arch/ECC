@@ -40,6 +40,19 @@ public:
         }
     }
 
+    void blkprint(){
+ 
+        for (int i=0; i<bitN; i++){
+            if(bitArr[i]==1)
+                printf("* ");
+            else
+                printf("%d ", bitArr[i]);
+                
+            if((i+1)%72==0&&i!=0)
+                printf("\n");
+        }
+    }
+
     Block &operator^=(const Block &rhs) {
         for (int i=0; i<bitN; i++) {
             bitArr[i] ^= rhs.bitArr[i];
@@ -96,6 +109,7 @@ public:
     // member fields
 protected:
     int chipWidth, channelWidth, beatHeight;
+
 };
 
 #endif /* __MESSAGE_HH__ */

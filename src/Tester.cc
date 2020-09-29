@@ -10,6 +10,8 @@
 #include "DomainGroup.hh"
 #include "codec.hh"
 #include "rs.hh"
+#include "progress.hh"
+#include "AccessFACH.hh"
 
 //------------------------------------------------------------------------------
 char errorName[][10] = {"NE ",
@@ -83,7 +85,6 @@ double TesterSystem::advance(double faultRate) {
 //------------------------------------------------------------------------------
 void TesterSystem::test(DomainGroup *dg, ECC *ecc, Scrubber *scrubber, long runCnt, char* filePrefix, int faultCount, std::string *faults) {
     assert(faultCount<=1);  // either no or 1 inherent fault
-
     Fault *inherentFault = NULL;
     // create log file
     std::string nameBuffer = std::string(filePrefix)+".S";
@@ -100,18 +101,21 @@ void TesterSystem::test(DomainGroup *dg, ECC *ecc, Scrubber *scrubber, long runC
 
     // for runCnt times
     for (long runNum=0; runNum<runCnt; runNum++) {
-        if ((runNum==100) || ((runNum!=0)&&(runNum%100000000==0))) {
+        ProgressStatus(runNum, runCnt);
+        if ((runNum==100) || ((runNum!=0)&&(runNum%1000000==0))) {
+            showCacheStatus();
             printSummary(fd, runNum);
         }
         if (runNum%10000000==0) {
         //if (runNum%1000000==0) {
-            printf("Processing %ldth iteration\n", runNum);
+            printf("\nProcessing %ldth iteration\n", runNum);
         }
 
         if (inherentFault!=NULL) {
             dg->setInitialRetiredBlkCount(ecc);
         }
 
+        // inter-arrival time of generating new f
         double hr = 0.;
 
         while (true) {
@@ -150,7 +154,7 @@ void TesterSystem::test(DomainGroup *dg, ECC *ecc, Scrubber *scrubber, long runC
                 }
                 break;
             } else if (result==SDC) {
-printf("hours %lf (%lfyrs)\n", hr, hr/(24*365));
+// printf("hours %lf (%lfyrs)\n", hr, hr/(24*365));
                 for (int i=0; i<MAX_YEAR; i++) {
                     if (hr < i*24*365) {
                         SDCCntYear[i]++;

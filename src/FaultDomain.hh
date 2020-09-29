@@ -7,7 +7,29 @@
 class ECC;
 class Fault;
 
-//------------------------------------------------------------------------------
+/**
+ * 
+ *  @brief The object of each channel(sever) in system.
+ * 
+ *  @param ranksPerDomain :  For system Configuration. same for all below 3 params
+ *  @param devicesPerRank :  (skip)
+ *  @param pinsPerDevice  :  (skip)
+ *  @param blkHeight      :  (skip)
+ * 
+ *  @param faultRateInfo : Object which is containg information about each fault's rate.  eg) single bit perament = 18.6 FIT
+ *  @param inherentFault : Object of Fault which is containg information about fault. eg) address, NumDQ etc....
+ * 
+ *  @param operationalFaultList : <list> of Fault objects
+ *  @param retiredBlkCount   : (For Bamboo ECC)
+ *  @param retiredPinIDList  : (For Bamboo ECC)
+ *  @param retiredChipIDList : (For Bamboo ECC)      
+ * 
+ * 
+ * 
+ *  @fn  ErrorType genSystemRandomFaultAndTest() : (Refer to FaultDomain.cc)
+ *  @fn (Remainder) : (already explained on high-level) or (content=title)
+ * 
+ */ 
 class FaultDomain {
 public:
     FaultDomain(int _ranksPerDomain, int _devicesPerRank, int _pinsPerDevice, int _blkHeight, FaultRateInfo *_faultRateInfo)
@@ -62,6 +84,8 @@ public:
 	int FaultyChipDetect();
 };
 
+
+
 //------------------------------------------------------------------------------
 class FaultDomainDDR : public FaultDomain {
 public:
@@ -71,6 +95,5 @@ public:
         delete faultRateInfo;
     }
 };
-
 //------------------------------------------------------------------------------
 #endif /* __FAULT_DOMAIN_HH__ */

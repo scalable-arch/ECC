@@ -14,10 +14,26 @@
 #include "message.hh"
 #include "FaultDomain.hh"
 #include "limits.h"
+#include <bitset>
 
 //------------------------------------------------------------------------------
 extern std::default_random_engine randomGenerator;
 
+/**
+ *  @brief Object for each individual Fault
+ *  
+ * 
+ *  @param beatCount : unit of decoding by ECC. equals to FaultDomain's blkHeight
+ *                     if beatStart==beatEnd --> beatCount = 1.
+ *  @param numDQ : How many pins have errors in each device
+ *  @param affectedBlkCount : 
+ * 
+ * 
+ *  @fn bool overlap(Fault *other) : inspect wheter two fault is in same codeword or not.
+ *  @fn void genRandomError(CacheLine *line) : manipulate Cacheline object. mark fault bit position in codeword.
+ *  @fn static Fault *genRandomFault(std::string type, FaultDomain *fd) : Return specific Fault object type.
+ * 
+ */
 //------------------------------------------------------------------------------
 class Fault {
 public:
@@ -40,6 +56,44 @@ public:
     int  getPinID() { return pinPos[0]; }
     int  getPinID1() { return pinPos[1]; }
     double getCellFaultRate() { return cellFaultRate; }
+
+    void FaultDebug(CacheLine *line){
+        std::cout << "name: " << name <<std::endl;
+
+        //binary
+        //std::cout << "addr: " << std::bitset<64>(addr) <<std::endl;
+        //std::cout << "mask: " << std::bitset<64>(mask)<<std::endl;
+
+        //hex
+        std::cout << "addr: " << std::hex << addr <<std::endl;
+        std::cout << "mask: " << std::hex << mask <<std::endl;
+
+        std::cout << "isInherent: " << isInherent <<" ";
+        std::cout << "isTransient: " << isTransient << " ";
+        std::cout << "numDQ: " << numDQ <<std::endl;
+
+        std::cout << "isSingleBeat: " << isSingleBeat <<" ";
+        std::cout << "isMultiColumn: " << isMultiColumn<<" ";
+        std::cout << "isMultiRow: " << isMultiRow<<" ";
+        std::cout << "isChannel: " << isChannel<<std::endl;
+
+        std::cout << std::dec << "affectedBlkCount: " << affectedBlkCount <<" ";
+        std::cout << "beatStart: " << beatStart <<" ";
+        std::cout << "beatEnd: " << beatEnd <<" ";
+        std::cout << "beatCount: " << beatCount <<std::endl;
+
+        std::cout << "chipPos: " << chipPos <<" ";
+        std::cout << "cellFaultRate: " << cellFaultRate <<std::endl;
+
+        std::cout << "the pinPose : ";
+        for(int i = 0; i<8; i++){
+            std::cout << pinPos[i] << " "; 
+        }
+        std::cout << std::endl;
+
+        
+        line->blkprint();
+    }
 
     void print(FILE *fd = stdout) { fprintf(fd, "%s ADDR=%016llx MASK=%016llx (T=%d)\n", name.c_str(), addr, getMask(), isTransient); }
     bool overlap(Fault *other) {
@@ -75,7 +129,9 @@ public:
             for (int beat = 0; beat < beatCount; beat++) {
                 for (int pin = 0; pin<numDQ; pin++) {
                     if ((randValue>>(beat*numDQ+pin))&1) {
-                        line->invBit(line->getChannelWidth()*(beat+beatStart)+pinPos[pin]);
+                        if(((double)rand()/RAND_MAX) > remapRatio){
+                            line->invBit(line->getChannelWidth()*(beat+beatStart)+pinPos[pin]);
+                        }
                     }
                 }
             }
@@ -101,6 +157,7 @@ public:
     int chipPos;
     int pinPos[8];
     double cellFaultRate;
+    double remapRatio;  // New for faultcache
 
     static const bool INHERENT = true;
     static const bool OPERATIONAL = false;
